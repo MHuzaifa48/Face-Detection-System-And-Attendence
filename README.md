@@ -27,7 +27,7 @@ https://www.jetbrains.com/pycharm/download/?section=windows
           Install the file.
 ![logo](https://www.tutorials24x7.com/uploads/2019-12-27/files/3-tutorials24x7-python-pycharm-location.png)
 # 2:Install the python latest pip and wheel loop
-## For Installation of Python Compiller
+## For Installation of Python Compiler
 
 Install my-project with python.First of all download the python Complier and then install by using the commend.
 Then Run the code in command prompt
