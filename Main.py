@@ -3,9 +3,8 @@ import pickle
 import numpy as np
 import cv2
 import face_recognition
-import cvzone
 import firebase_admin
-from firebase_admin import credentials, db, storage
+from firebase_admin import credentials, db, storage, exceptions as firebase_exceptions
 from datetime import datetime
 
 # Initialize Firebase
@@ -65,7 +64,7 @@ while True:
     encodeCurFrame = face_recognition.face_encodings(imgS, faceCurFrame)
 
     imgBackground[162:162 + 480, 55:55 + 640] = img
-    imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[modeType]
+    imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[min(modeType, len(imgModeList) - 1)]
 
     if faceCurFrame:
         for encodeFace, faceLoc in zip(encodeCurFrame, faceCurFrame):
@@ -73,16 +72,23 @@ while True:
             faceDis = face_recognition.face_distance(encodeListKnown, encodeFace)
 
             matchIndex = np.argmin(faceDis)
+            if not matches[matchIndex]:
+                modeType = 0
+                counter = 0
+                cv2.putText(imgBackground, "Invalid Person", (275, 400), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                cv2.imshow("Face Attendance System", imgBackground)
+                cv2.waitKey(1)
 
             if matches[matchIndex]:
                 y1, x2, y2, x1 = faceLoc
                 y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
                 bbox = 55 + x1, 162 + y1, x2 - x1, y2 - y1
-                imgBackground = cvzone.cornerRect(imgBackground, bbox, rt=0)
+                imgBackground = cv2.rectangle(imgBackground, (int(bbox[0]), int(bbox[1])),
+                                              (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3])), (0, 255, 0), 2)
                 id = studentIds[matchIndex]
 
                 if counter == 0:
-                    cvzone.putTextRect(imgBackground, "Loading", (275, 400))
+                    cv2.putText(imgBackground, "Loading", (275, 400), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
                     cv2.imshow("Face Attendance System", imgBackground)
                     cv2.waitKey(1)
                     counter = 1
@@ -91,16 +97,16 @@ while True:
                 try:
                     # Try to access the student information from the database
                     studentInfo = db.reference(f'Students/{id}').get()
-                except firebase_admin.exceptions.NotFoundError:
-                    print(f"Student with ID {id} not found in the database.")
+                except firebase_exceptions.FirebaseError as e:
+                    print(f"Error accessing Firebase: {e}")
                     counter = 0
                     modeType = 0
-                    imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[modeType]
-                    continue  # Skip the rest of the loop if student data is not found
+                    imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[min(modeType, len(imgModeList) - 1)]
+                    continue
 
                 blob = bucket.get_blob(f'images/{id}.png')
                 array = np.frombuffer(blob.download_as_string(), np.uint8)
-                imgStudent = cv2.imdecode(array, cv2.COLOR_BGRA2BGR)
+                imgStudent = cv2.imdecode(array, cv2.IMREAD_COLOR)
 
                 datetimeObject = datetime.strptime(studentInfo['last_attendance_time'], "%Y-%m-%d %H:%M:%S")
                 secondsElapsed = (datetime.now() - datetimeObject).total_seconds()
@@ -113,7 +119,7 @@ while True:
                 else:
                     modeType = 3
                     counter = 0
-                    imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[modeType]
+                    imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[min(modeType, len(imgModeList) - 1)]
 
             if counter != 0:
                 if counter == 1:
@@ -124,7 +130,7 @@ while True:
                     if 10 < counter < 20:
                         modeType = 2
 
-                    imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[modeType]
+                    imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[min(modeType, len(imgModeList) - 1)]
 
                     if counter <= 10:
                         # Your existing code for displaying student information here
@@ -135,7 +141,7 @@ while True:
                         modeType = 0
                         studentInfo = []
                         imgStudent = []
-                        imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[3]
+                        imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[min(modeType, len(imgModeList) - 1)]
     else:
         modeType = 0
         counter = 0
