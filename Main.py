@@ -10,8 +10,8 @@ from datetime import datetime
 # Initialize Firebase
 cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred, {
-    'databaseURL': "",
-    'storageBucket': ""
+    'databaseURL': "https://face-attendence-system-4e8cd-default-rtdb.firebaseio.com/",
+    'storageBucket': "face-attendence-system-4e8cd.appspot.com"
 })
 
 bucket = storage.bucket()
@@ -79,69 +79,73 @@ while True:
                 cv2.imshow("Face Attendance System", imgBackground)
                 cv2.waitKey(1)
 
-            if matches[matchIndex]:
-                y1, x2, y2, x1 = faceLoc
-                y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
-                bbox = 55 + x1, 162 + y1, x2 - x1, y2 - y1
-                imgBackground = cv2.rectangle(imgBackground, (int(bbox[0]), int(bbox[1])),
-                                              (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3])), (0, 255, 0), 2)
-                id = studentIds[matchIndex]
+            else:
+                confidence = 1 - faceDis[matchIndex]  # Confidence is a value between 0 and 1
+                if confidence >= 0.5:
+                    y1, x2, y2, x1 = faceLoc
+                    y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
+                    bbox = 55 + x1, 162 + y1, x2 - x1, y2 - y1
+                    imgBackground = cv2.rectangle(imgBackground, (int(bbox[0]), int(bbox[1])),
+                                                  (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3])), (0, 255, 0), 2)
+                    id = studentIds[matchIndex]
 
-                if counter == 0:
-                    cv2.putText(imgBackground, "Loading", (275, 400), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                    cv2.imshow("Face Attendance System", imgBackground)
-                    cv2.waitKey(1)
-                    counter = 1
-                    modeType = 1
+                    if counter == 0:
+                        cv2.putText(imgBackground, "Loading", (275, 400), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                                    (255, 255, 255), 2)
+                        cv2.imshow("Face Attendance System", imgBackground)
+                        cv2.waitKey(1)
+                        counter = 1
+                        modeType = 1
 
-                try:
-                    # Try to access the student information from the database
-                    studentInfo = db.reference(f'Students/{id}').get()
-                except firebase_exceptions.FirebaseError as e:
-                    print(f"Error accessing Firebase: {e}")
-                    counter = 0
-                    modeType = 0
-                    imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[min(modeType, len(imgModeList) - 1)]
-                    continue
-
-                blob = bucket.get_blob(f'images/{id}.png')
-                array = np.frombuffer(blob.download_as_string(), np.uint8)
-                imgStudent = cv2.imdecode(array, cv2.IMREAD_COLOR)
-
-                datetimeObject = datetime.strptime(studentInfo['last_attendance_time'], "%Y-%m-%d %H:%M:%S")
-                secondsElapsed = (datetime.now() - datetimeObject).total_seconds()
-
-                if secondsElapsed > 30:
-                    ref = db.reference(f'Students/{id}')
-                    studentInfo['total_attendance'] += 1
-                    ref.child('total_attendance').set(studentInfo['total_attendance'])
-                    ref.child('last_attendance_time').set(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                else:
-                    modeType = 3
-                    counter = 0
-                    imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[min(modeType, len(imgModeList) - 1)]
-
-            if counter != 0:
-                if counter == 1:
-                    # Your existing code for displaying student information here
-                    counter += 1
-
-                if modeType != 3:
-                    if 10 < counter < 20:
-                        modeType = 2
-
-                    imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[min(modeType, len(imgModeList) - 1)]
-
-                    if counter <= 10:
-                        # Your existing code for displaying student information here
-                        counter += 1
-
-                    if counter >= 20:
+                    try:
+                        # Try to access the student information from the database
+                        studentInfo = db.reference(f'Students/{id}').get()
+                    except firebase_exceptions.FirebaseError as e:
+                        print(f"Error accessing Firebase: {e}")
                         counter = 0
                         modeType = 0
-                        studentInfo = []
-                        imgStudent = []
                         imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[min(modeType, len(imgModeList) - 1)]
+                        continue
+
+                    blob = bucket.get_blob(f'images/{id}.png')
+                    array = np.frombuffer(blob.download_as_string(), np.uint8)
+                    imgStudent = cv2.imdecode(array, cv2.IMREAD_COLOR)
+
+                    datetimeObject = datetime.strptime(studentInfo['last_attendance_time'], "%Y-%m-%d %H:%M:%S")
+                    secondsElapsed = (datetime.now() - datetimeObject).total_seconds()
+
+                    if secondsElapsed > 30:
+                        ref = db.reference(f'Students/{id}')
+                        studentInfo['total_attendance'] += 1
+                        ref.child('total_attendance').set(studentInfo['total_attendance'])
+                        ref.child('last_attendance_time').set(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                    else:
+                        modeType = 3
+                        counter = 0
+                        imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[min(modeType, len(imgModeList) - 1)]
+
+                    if counter != 0:
+                        if counter == 1:
+                            # Your existing code for displaying student information here
+                            counter += 1
+
+                        if modeType != 3:
+                            if 10 < counter < 20:
+                                modeType = 2
+
+                            imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[min(modeType, len(imgModeList) - 1)]
+
+                            if counter <= 10:
+                                # Your existing code for displaying student information here
+                                counter += 1
+
+                            if counter >= 20:
+                                counter = 0
+                                modeType = 0
+                                studentInfo = []
+                                imgStudent = []
+                                imgBackground[44:44 + 633, 808:808 + 414] = imgModeList[min(modeType, len(imgModeList) - 1)]
+
     else:
         modeType = 0
         counter = 0
